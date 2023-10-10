@@ -3,8 +3,12 @@ const app = express()
 
 app.use(express.json())
 
+// Cross Origin Resource Sharing
 const cors = require("cors")
 app.use(cors())
+
+// To make express show static content
+app.use(express.static("dist"))
 
 
 let phonebook = [
