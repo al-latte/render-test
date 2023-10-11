@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const express = require("express")
 const app = express()
 
@@ -10,6 +12,21 @@ app.use(cors())
 // To make express show static content
 app.use(express.static("dist"))
 
+const Contact = require("./models/contact")
+
+// error handling
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+  
+    if (error.name === 'CastError') {
+      return response.status(400).send({ error: 'malformatted id' })
+    } 
+  
+    next(error)
+  }
+
+app.use(errorHandler)
+  
 
 let phonebook = [
     { 
@@ -40,25 +57,28 @@ app.get("/info", (req, res) => {
 })
 
 app.get("/api/persons", (req, res) => {
-    res.json(phonebook)
-})
-
-app.get("/api/persons/:id", (req, res) => {
-    const id = Number(req.params.id)
-    const contact = phonebook.find(con => con.id === id)
-    if(contact) {
+    Contact.find({}).then(contact => {
         res.json(contact)
-    } else {
-        res.status(404).end()
-    }
-        
+    })
+    
 })
 
-app.delete("/api/persons/:id", (req, res) => {
-    const id = Number(req.params.id)
-    phonebook = phonebook.filter(contact => contact.id !== id)
+app.get("/api/persons/:id", (req, res, next) => {
+    Contact.findById(req.params.id).then(contact => {
+        if(contact) {
+            res.json(contact)
+        } else {
+            res.status(404).end()
+        }
+    }).catch(error => next(error))
+})
 
-    res.status(204).end()
+app.delete("/api/persons/:id", (req, res, next) => {
+    Contact.findByIdAndRemove(req.params.id)
+    .then(results => {
+      res.status(204).end()
+    })
+    .catch(error => next(error))
 })
 
 const generateId = () => {
@@ -81,17 +101,19 @@ app.post("/api/persons", (req, res) => {
         })
       }
 
-    const newContact = {    
+    const newContact = new Contact({    
     name: body.name,
     number: body.number, 
     id: generateId(),
-    }
+    })
 
-    phonebook = phonebook.concat(newContact)
+    newContact.save().then(savedContact => {
+        res.json(savedContact)
+    })
 
-    res.json(newContact)
+    
 })
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT)
 console.log(`Server running on port ${PORT}`)
